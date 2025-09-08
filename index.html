@@ -1,0 +1,578 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Elongma Runner — Play / Share</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <style>
+    :root{
+      --bg:#071026;
+      --panel:#0f1724;
+      --accent:#ffd700;
+      --muted:#9aa8bb;
+    }
+    html,body{height:100%;margin:0;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;color:#fff}
+    .wrap{max-width:1100px;margin:12px auto;padding:12px;}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    header img{width:56px;height:56px;border-radius:10px;object-fit:cover;border:2px solid rgba(255,255,255,0.06)}
+    h1{font-size:18px;margin:0}
+    .sub{color:var(--muted);font-size:13px;margin-top:4px}
+    .game-card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:10px;box-shadow:0 8px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+    canvas{display:block;width:100%;height:auto;border-radius:10px;background:linear-gradient(180deg,#07182b,#072032);outline:1px solid rgba(255,255,255,0.02)}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+    .btn{background:var(--panel);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);cursor:pointer;color:#fff;font-weight:600}
+    .btn.ghost{background:transparent;border:1px dashed rgba(255,255,255,0.06);font-weight:500}
+    .scoreboard{margin-left:auto;text-align:right}
+    .score{font-size:18px;font-weight:700}
+    .small{font-size:12px;color:var(--muted)}
+    .overlay{position:relative}
+    .ui-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .big-jump{position:absolute;right:14px;bottom:14px;background:linear-gradient(90deg,#ffd54a,#ffb400);color:#111;padding:14px 16px;border-radius:999px;font-weight:800;border:none;box-shadow:0 8px 24px rgba(0,0,0,0.45)}
+    .info{display:flex;gap:8px;align-items:center}
+    .leaderboard{margin-top:12px;display:grid;grid-template-columns:1fr 240px;gap:12px}
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    .lb-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.02)}
+    .muted{color:var(--muted);font-size:13px}
+    .center{display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .credits{margin-top:8px;color:var(--muted);font-size:12px}
+    @media(max-width:720px){
+      header h1{font-size:16px}
+      .leaderboard{grid-template-columns:1fr}
+      .big-jump{right:10px;bottom:10px;padding:12px 14px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img id="logo" src="https://black-labour-buzzard-448.mypinata.cloud/ipfs/bafybeiddmwvy45g4zsxgngsiihxq7tztvjenjkt5utrdgwla5vhxnihmp4" alt="Elongma">
+      <div>
+        <h1>Elongma Runner — Play the Meme Coin Game</h1>
+        <div class="sub">Fun, meme-themed, and built for the Elongma community — tap to jump, collect coins, and beat the leaderboard.</div>
+      </div>
+      <div style="margin-left:auto" class="small muted">Made with ♥ for ELONGMA</div>
+    </header>
+
+    <div class="game-card overlay">
+      <div class="ui-top">
+        <div class="info">
+          <div style="font-weight:700">Elongma Runner</div>
+          <div style="margin-left:12px" class="muted">Avoid rockets • Collect ELONG coins • Mobile friendly</div>
+        </div>
+        <div class="scoreboard">
+          <div class="small muted">Score</div>
+          <div class="score" id="score">0</div>
+          <div class="small muted" id="highText">High: 0</div>
+        </div>
+      </div>
+
+      <canvas id="gameCanvas" width="900" height="360"></canvas>
+
+      <button class="big-jump" id="jumpBtn">JUMP ⬆️</button>
+
+      <div class="controls">
+        <button class="btn" id="startBtn">Start</button>
+        <button class="btn ghost" id="pauseBtn">Pause</button>
+        <button class="btn ghost" id="soundBtn">Sound: On</button>
+        <button class="btn ghost" id="shareBtn">Share Score</button>
+        <div style="margin-left:auto" class="muted">Controls: Tap canvas / Space / Jump button</div>
+      </div>
+
+      <div class="leaderboard">
+        <div class="panel">
+          <div style="font-weight:700;margin-bottom:8px">How to Play</div>
+          <div class="muted">Tap the screen or press Space to jump. Collect golden Elong coins to gain combo points. Avoid rockets — colliding ends your run. Share your score on X/Twitter!</div>
+          <div class="credits">Pro tips: collect coins for combos, hold momentum for mid-air dodge, and practice for longer runs!</div>
+        </div>
+
+        <div class="panel">
+          <div style="font-weight:700;margin-bottom:8px">Leaderboard — Top 5</div>
+          <div id="leaderboardContainer"></div>
+          <div style="margin-top:10px" class="muted">Your browser stores leaderboard locally (privacy friendly).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ============================
+   Elongma Runner — Single File
+   - Responsive canvas
+   - Player image from your IPFS/Pinata link
+   - Collectibles, obstacles, parallax, particles
+   - WebAudio for jump/collect/crash
+   - Local leaderboard
+   ============================ */
+
+(() => {
+  // Config
+  const PLAYER_SIZE = 64;            // base player size (will scale)
+  const GRAVITY = 0.7;
+  const BASE_SPEED = 5.5;
+  const CANVAS_ID = 'gameCanvas';
+  const PLAYER_SRC = 'https://black-labour-buzzard-448.mypinata.cloud/ipfs/bafybeiddmwvy45g4zsxgngsiihxq7tztvjenjkt5utrdgwla5vhxnihmp4';
+
+  // Elements
+  const canvas = document.getElementById(CANVAS_ID);
+  const ctx = canvas.getContext('2d');
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const soundBtn = document.getElementById('soundBtn');
+  const scoreEl = document.getElementById('score');
+  const highText = document.getElementById('highText');
+  const jumpBtn = document.getElementById('jumpBtn');
+  const shareBtn = document.getElementById('shareBtn');
+  const lbContainer = document.getElementById('leaderboardContainer');
+
+  // Responsive scaling
+  let DPR = Math.min(window.devicePixelRatio || 1, 2);
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width * DPR);
+    canvas.height = Math.floor((rect.width * 0.4) * DPR); // keep around 2.5:1 ratio
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize', () => { resizeCanvas(); renderOnce(); });
+  resizeCanvas();
+
+  // Audio (WebAudio) — small sound generator
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+  let soundOn = true;
+  function initAudio(){
+    if(!audioCtx){ audioCtx = new AudioCtx(); }
+  }
+  function playBeep(freq=440, length=0.09, type='sine', vol=0.12){
+    if(!soundOn) return;
+    initAudio();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    o.stop(audioCtx.currentTime + length);
+  }
+  function playCollect(){
+    // rising arpeggio
+    playBeep(880,0.06,'triangle',0.06);
+    setTimeout(()=>playBeep(1100,0.06,'triangle',0.05),60);
+  }
+  function playJump(){
+    playBeep(520,0.09,'sine',0.08);
+  }
+  function playCrash(){
+    if(!soundOn) return;
+    initAudio();
+    const bufferSize = 2*audioCtx.sampleRate;
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){ output[i] = (Math.random()*2-1) * Math.exp(-i/(audioCtx.sampleRate*0.3)); }
+    const white = audioCtx.createBufferSource();
+    white.buffer = noiseBuffer;
+    const sh = audioCtx.createBiquadFilter();
+    sh.type = 'lowpass'; sh.frequency.value = 800;
+    const g = audioCtx.createGain(); g.gain.value = 0.12;
+    white.connect(sh); sh.connect(g); g.connect(audioCtx.destination);
+    white.start();
+    white.stop(audioCtx.currentTime + 0.6);
+  }
+
+  // Game state
+  let running = false, paused = false;
+  let speed = BASE_SPEED;
+  let score = 0, highscore = parseInt(localStorage.getItem('elongma_high')||'0',10);
+  highText.textContent = 'High: ' + highscore;
+
+  // Player
+  const playerImg = new Image();
+  playerImg.crossOrigin = 'anonymous';
+  playerImg.src = PLAYER_SRC;
+
+  const player = {
+    x: 80,
+    y: 0,
+    w: PLAYER_SIZE,
+    h: PLAYER_SIZE,
+    vy: 0,
+    grounded: false,
+    jumpPower: 13,
+    draw(){
+      // nice circular shadow + image
+      const pr = this.w;
+      ctx.save();
+      // shadow
+      ctx.beginPath();
+      ctx.ellipse(this.x + pr/2, canvas.height/DPR - 18, pr*0.45, 8, 0, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fill();
+      // image
+      // rounded image clip
+      const radius = 8;
+      roundRect(ctx, this.x, this.y, this.w, this.h, radius);
+      ctx.clip();
+      ctx.drawImage(playerImg, this.x, this.y, this.w, this.h);
+      ctx.restore();
+      // name badge
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(this.x, this.y + this.h - 16, this.w, 16);
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '11px Inter, Arial';
+      ctx.fillText('ELONGMA', this.x + 8, this.y + this.h - 4);
+    },
+    update(){
+      this.vy += GRAVITY;
+      this.y += this.vy;
+      if(this.y + this.h >= (canvas.height/DPR - 20)){
+        this.y = canvas.height/DPR - 20 - this.h;
+        this.vy = 0; this.grounded = true;
+      } else {
+        this.grounded = false;
+      }
+    },
+    jump(){
+      if(this.grounded){
+        this.vy = -this.jumpPower; this.grounded = false; playJump();
+      }
+    },
+    reset(){
+      this.w = Math.max(40, Math.min(80, canvas.width/12));
+      this.h = this.w;
+      this.x = Math.max(60, canvas.width*0.08);
+      this.y = canvas.height/DPR - 20 - this.h;
+      this.vy = 0;
+      this.grounded = true;
+      this.jumpPower = Math.max(10, this.h/6 + 6);
+    }
+  };
+
+  // Round rect helper
+  function roundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  // Particles (for coin collect)
+  const particles = [];
+  function spawnParticles(x,y,color,amount=10){
+    for(let i=0;i<amount;i++){
+      particles.push({
+        x, y,
+        vx: (Math.random()-0.5)*4,
+        vy: (Math.random()-1.5)*4,
+        life: 40 + Math.random()*30,
+        color
+      });
+    }
+  }
+  function updateParticles(){
+    for(let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.vy += 0.18;
+      p.x += p.vx; p.y += p.vy; p.life--;
+      if(p.life <= 0) particles.splice(i,1);
+    }
+  }
+  function drawParticles(){
+    for(const p of particles){
+      ctx.globalAlpha = Math.max(0, p.life/60);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Background parallax layers
+  const bgStars = [];
+  function initBG(){
+    bgStars.length = 0;
+    const count = Math.round(canvas.width / 6);
+    for(let i=0;i<count;i++){
+      bgStars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.6, size: Math.random()*2+0.5, speed: Math.random()*0.3+0.1});
+    }
+  }
+  function drawBG(){
+    // gradient sky
+    const grad = ctx.createLinearGradient(0,0,0, canvas.height/DPR);
+    grad.addColorStop(0, '#05263a'); grad.addColorStop(1,'#07182b');
+    ctx.fillStyle = grad; ctx.fillRect(0,0, canvas.width/DPR, canvas.height/DPR);
+
+    // stars
+    for(const s of bgStars){
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#8fd8ff';
+      ctx.fillRect(s.x, s.y, s.size, s.size);
+      s.x -= s.speed * (speed/BASE_SPEED);
+      if(s.x < -10) s.x = canvas.width + 10;
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Obstacles and coins
+  const obstacles = [];
+  const coins = [];
+
+  class Obstacle {
+    constructor(){
+      this.size = Math.max(28, Math.min(72, Math.random()*48 + 24));
+      this.x = canvas.width/DPR + Math.random()*200;
+      this.y = canvas.height/DPR - 20 - this.size;
+      this.w = this.size; this.h = this.size;
+      this.color = '#ff4e3a';
+      this.hit = false;
+      this.type = 'rocket';
+    }
+    update(){ this.x -= speed; }
+    draw(){
+      ctx.fillStyle = this.color;
+      // body
+      roundRect(ctx, this.x, this.y, this.w, this.h, 6);
+      ctx.fillStyle = '#fff';
+      ctx.font = `${Math.max(12, this.w*0.45)}px serif`;
+      ctx.fillText('🚀', this.x + 6, this.y + this.h - 8);
+    }
+  }
+
+  class Coin {
+    constructor(){
+      this.size = Math.max(18, Math.min(40, Math.random()*26 + 16));
+      this.x = canvas.width/DPR + Math.random()*300;
+      this.y = (canvas.height/DPR - 20 - this.size) - (Math.random()*80);
+      this.w = this.size; this.h = this.size;
+      this.collected = false;
+      this.speedy = Math.random()*0.6 + 0.8;
+    }
+    update(){ this.x -= speed * this.speedy; this.y += Math.sin((this.x/40))/30; }
+    draw(){
+      // golden coin with ELONG
+      ctx.save();
+      roundRect(ctx, this.x, this.y, this.w, this.h, 8);
+      ctx.clip();
+      // gradient
+      const g = ctx.createLinearGradient(this.x, this.y, this.x+this.w, this.y+this.h);
+      g.addColorStop(0,'#fff5bf'); g.addColorStop(1,'#ffd54a');
+      ctx.fillStyle = g; ctx.fillRect(this.x, this.y, this.w, this.h);
+      ctx.restore();
+      ctx.fillStyle = '#b35900'; ctx.font = `${Math.max(10, this.w*0.35)}px Inter, Arial`;
+      ctx.fillText('EL', this.x + this.w*0.18, this.y + this.h*0.65);
+    }
+  }
+
+  function spawnObstacleOrCoin(){
+    const r = Math.random();
+    if(r < 0.65){
+      obstacles.push(new Obstacle());
+    } else {
+      coins.push(new Coin());
+    }
+  }
+
+  // Collisions
+  function intersects(a, b){
+    return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h);
+  }
+
+  // Score & combos
+  let combo = 0;
+  function collectCoin(c){
+    c.collected = true;
+    score += 50 + combo * 5;
+    combo++;
+    spawnParticles(c.x + c.w/2, c.y + c.h/2, '#ffd54a', 14);
+    playCollect();
+  }
+
+  // Leaderboard (local)
+  function getLeaderboard(){ return JSON.parse(localStorage.getItem('elongma_lb') || '[]'); }
+  function saveToLeaderboard(name, sc){
+    const lb = getLeaderboard();
+    lb.push({name: name || 'You', score: sc, time: Date.now()});
+    lb.sort((a,b)=>b.score - a.score);
+    localStorage.setItem('elongma_lb', JSON.stringify(lb.slice(0,20)));
+    renderLeaderboard();
+  }
+  function renderLeaderboard(){
+    const lb = getLeaderboard().slice(0,5);
+    if(lb.length === 0){
+      lbContainer.innerHTML = '<div class="muted">No scores yet — be the first!</div>';
+      return;
+    }
+    lbContainer.innerHTML = lb.map((it, idx) => `
+      <div class="lb-item">
+        <div style="font-weight:700">${idx+1}. ${escapeHtml(it.name)}</div>
+        <div class="muted">${it.score}</div>
+      </div>
+    `).join('');
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // Game loop
+  let lastTime = 0;
+  function loop(t){
+    if(!running || paused){ renderOnce(); return; }
+    const dt = (t - lastTime) / 16.67; // ~60fps baseline
+    lastTime = t;
+
+    // clear & background
+    drawBG();
+
+    // ground
+    ctx.fillStyle = '#062a1e';
+    ctx.fillRect(0, canvas.height/DPR - 20, canvas.width/DPR, 20);
+
+    // spawn logic
+    if(Math.random() < 0.02 + Math.min(0.018 * (score/300), 0.05)) {
+      spawnObstacleOrCoin();
+    }
+
+    // update obstacles
+    for(let i = obstacles.length-1; i>=0; i--){
+      const ob = obstacles[i]; ob.update();
+      ob.draw();
+      if(ob.x + ob.w < -40) obstacles.splice(i,1);
+      if(!ob.hit && intersects(ob, player)){
+        ob.hit = true;
+        // crash
+        running = false;
+        playCrash();
+        spawnParticles(player.x + player.w/2, player.y + player.h/2, '#ff4e3a', 40);
+        endGame();
+        return;
+      }
+    }
+
+    // update coins
+    for(let i = coins.length-1; i>=0; i--){
+      const c = coins[i]; c.update();
+      c.draw();
+      if(c.x + c.w < -20) coins.splice(i,1);
+      if(!c.collected && intersects(c, player)){
+        collectCoin(c);
+        setTimeout(()=>{ const idx = coins.indexOf(c); if(idx>=0) coins.splice(idx,1); }, 10);
+      }
+    }
+
+    // update player
+    player.update();
+    player.draw();
+
+    // particles
+    updateParticles();
+    drawParticles();
+
+    // HUD update
+    score += 1; // passive score
+    scoreEl.textContent = Math.floor(score);
+    if(Math.floor(score) > highscore) { highscore = Math.floor(score); highText.textContent = 'High: ' + highscore; }
+
+    // speed control
+    speed = BASE_SPEED + Math.floor(score/800);
+
+    requestAnimationFrame(loop);
+  }
+
+  function renderOnce(){
+    // single frame render (used when paused or not running)
+    drawBG();
+    ctx.fillStyle = '#062a1e';
+    ctx.fillRect(0, canvas.height/DPR - 20, canvas.width/DPR, 20);
+    for(const ob of obstacles) ob.draw();
+    for(const c of coins) c.draw();
+    player.draw();
+    drawParticles();
+  }
+
+  function startGame(){
+    // reset
+    running = true; paused = false;
+    obstacles.length = 0; coins.length = 0; particles.length = 0;
+    combo = 0;
+    score = 0; scoreEl.textContent = '0';
+    player.reset();
+    speed = BASE_SPEED;
+    lastTime = performance.now();
+    renderLeaderboard();
+    requestAnimationFrame(loop);
+  }
+
+  function pauseGame(){
+    paused = !paused;
+    pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+    if(!paused && running){ lastTime = performance.now(); requestAnimationFrame(loop); }
+  }
+
+  function endGame(){
+    // show simple prompt for name
+    const sc = Math.floor(score);
+    setTimeout(()=>{
+      const name = prompt('Game over! Your score: ' + sc + '\nEnter a name for the leaderboard (or leave empty):', 'ElongmaFan');
+      saveToLeaderboard(name, sc);
+    }, 150);
+    // reset running state
+    running = false;
+    pauseBtn.textContent = 'Pause';
+  }
+
+  // Controls
+  document.addEventListener('keydown', e => {
+    if(e.code === 'Space') {
+      e.preventDefault();
+      if(!running) startGame();
+      else player.jump();
+    }
+    if(e.code === 'KeyP') pauseGame();
+  });
+  canvas.addEventListener('click', (e) => {
+    if(!running) startGame();
+    else player.jump();
+  });
+  jumpBtn.addEventListener('click', () => {
+    if(!running) startGame();
+    else player.jump();
+  });
+  startBtn.addEventListener('click', () => startGame());
+  pauseBtn.addEventListener('click', () => pauseGame());
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = 'Sound: ' + (soundOn ? 'On' : 'Off');
+    if(soundOn) initAudio();
+  });
+  shareBtn.addEventListener('click', () => {
+    const sc = Math.floor(score);
+    const url = encodeURIComponent(location.href);
+    const txt = encodeURIComponent(`I scored ${sc} on Elongma Runner! Can you beat me? 🚀 #Elongma`);
+    const shareURL = `https://twitter.com/intent/tweet?text=${txt}&url=${url}`;
+    window.open(shareURL, '_blank');
+  });
+
+  // Init
+  function setupSizes(){
+    // adjust DPR and player size based on canvas bounding
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    resizeCanvas();
+    player.reset();
+    initBG();
+  }
+  setupSizes();
+  renderLeaderboard();
+  renderOnce();
+
+  // small startup animation
+  let introDone = false;
+  function introPulse(){
+    if(introDone) return;
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.ellipse(player.x + player.w/2, player.y + player.h/2, 80, 40, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    requestAnimationFrame(introPulse);
+  }
+  setT
